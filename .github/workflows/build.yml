@@ -1,0 +1,63 @@
+name: LLVM/Clang build
+
+on: push
+
+env:
+  LLVM_VERSION: ${{ '13.0.0' }}
+  COMMON_CMAKE_VARS: ${{ '-DLLVM_ENABLE_PROJECTS=clang -DLLVM_BUILD_TOOLS=OFF -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DLLVM_BUILD_LLVM_DYLIB=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_ENABLE_FFI=OFF -DLLVM_ENABLE_ZLIB=OFF DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_TERMINFO=OFF' }}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    name: Build - ${{ matrix.os }}
+
+    steps:
+
+      - name: Download llvm-project source
+        run: |
+          cd ${{ runner.temp }}
+          git clone --depth 1 --branch llvmorg-${{ env.LLVM_VERSION }} https://github.com/llvm/llvm-project
+
+      - name: Create build/installation directory - Unix
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          mkdir ${{ runner.temp }}/build
+          mkdir ${{ runner.temp }}/llvm
+        
+      - name: Create build/installation directory - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          New-Item -Path ${{ runner.temp }} -Name "build" -ItemType "directory"
+          New-Item -Path ${{ runner.temp }} -Name "llvm" -ItemType "directory"
+
+      - name: Configure build - Windows
+        uses: ilammy/msvc-dev-cmd@v1
+        if: ${{ matrix.os == 'windows-latest' }}
+        with:
+          arch: x86
+
+      - name: Build - Unix
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          cd ${{ runner.temp }}/build
+          mkdir Release
+          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/llvm ${{ runner.temp }}/llvm-project/llvm
+          cmake --build . --target install --config Release
+
+      - name: Build - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          cd ${{ runner.temp }}/build
+          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/llvm -DLLVM_TARGETS_TO_BUILD=X86 -G "Visual Studio 16 2019" -A Win32 -Thost=x64 ${{ runner.temp }}/llvm-project/llvm
+          msbuild ${{ runner.temp }}/build/INSTALL.vcxproj -p:Configuration=Release -p:Platform=Win32 -m
+
+      - name: upload Package
+        uses: actions/upload-artifact@v2.2.3
+        with:
+          name: llvm-clang_${{ matrix.os }}
+          path: ${{ runner.temp }}/llvm/*
