@@ -10,13 +10,28 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-18.04, macos-10.15, windows-latest]
 
     runs-on: ${{ matrix.os }}
 
     name: Build - ${{ matrix.os }}
 
     steps:
+      - uses: actions/checkout@v2
+
+      - name: Create package name - Unix
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          echo "PACKAGE_NAME=vf-llvm-clang-build$(git describe --always)" >> $GITHUB_ENV
+
+      - name: Create package name - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          echo "PACKAGE_NAME=vf-llvm-clang-build$(git describe --always)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Ninja - Unix
+        if: ${{ runner.os != 'windows-latest' }}
+        uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Download llvm-project source
         run: |
@@ -27,13 +42,13 @@ jobs:
         if: ${{ matrix.os != 'windows-latest' }}
         run: |
           mkdir ${{ runner.temp }}/build
-          mkdir ${{ runner.temp }}/llvm
+          mkdir ${{ runner.temp }}/${{ env.PACKAGE_NAME }}
         
       - name: Create build/installation directory - Windows
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
           New-Item -Path ${{ runner.temp }} -Name "build" -ItemType "directory"
-          New-Item -Path ${{ runner.temp }} -Name "llvm" -ItemType "directory"
+          New-Item -Path ${{ runner.temp }} -Name "${{ env.PACKAGE_NAME }}" -ItemType "directory"
 
       - name: Configure build - Windows
         uses: ilammy/msvc-dev-cmd@v1
@@ -46,18 +61,48 @@ jobs:
         run: |
           cd ${{ runner.temp }}/build
           mkdir Release
-          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/llvm ${{ runner.temp }}/llvm-project/llvm
+          cmake -G Ninja ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} ${{ runner.temp }}/llvm-project/llvm
           cmake --build . --target install --config Release
 
       - name: Build - Windows
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
           cd ${{ runner.temp }}/build
-          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/llvm -DLLVM_TARGETS_TO_BUILD=X86 -G "Visual Studio 16 2019" -A Win32 -Thost=x64 ${{ runner.temp }}/llvm-project/llvm
+          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} -DLLVM_TARGETS_TO_BUILD=X86 -G "Visual Studio 16 2019" -A Win32 -Thost=x64 ${{ runner.temp }}/llvm-project/llvm
           msbuild ${{ runner.temp }}/build/INSTALL.vcxproj -p:Configuration=Release -p:Platform=Win32 -m
+
+      # Otherwise, execution permissions are lost for binaries when the 'upload Package' action is used
+      - name: Create build tarball - Unix
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          cd ${{ runner.temp }}
+          tar -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz ${{ env.PACKAGE_NAME }}
+          
+      # Install cygwin so we can use GNU tar (instead of Windows' tar)
+      - name: Set up Cygwin
+        if: ${{ matrix.os == 'windows-latest' }}
+        uses: egor-tensin/setup-cygwin@v3
+        with:
+          platform: x86
+          
+      - name: Create build tarball - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          cd ${{ runner.temp }}
+          C:\tools\cygwin\bin\tar.exe -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz ${{ env.PACKAGE_NAME }}
+
+      - name: Produce shasum 256 - Unix
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
+
+      - name: Produce shasum 256 - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz" -Algorithm SHA256
 
       - name: upload Package
         uses: actions/upload-artifact@v2.2.3
         with:
-          name: llvm-clang_${{ matrix.os }}
-          path: ${{ runner.temp }}/llvm/*
+          name: vf-llvm-clang-${{ runner.os }}
+          path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
