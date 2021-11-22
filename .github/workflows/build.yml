@@ -22,12 +22,12 @@ jobs:
       - name: Create package name - Unix
         if: ${{ matrix.os != 'windows-latest' }}
         run: |
-          echo "PACKAGE_NAME=vf-llvm-clang-build$(git describe --always)" >> $GITHUB_ENV
+          echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" >> $GITHUB_ENV
 
       - name: Create package name - Windows
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
-          echo "PACKAGE_NAME=vf-llvm-clang-build$(git describe --always)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Ninja - Unix
         if: ${{ runner.os != 'windows-latest' }}
