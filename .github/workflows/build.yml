@@ -10,7 +10,13 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-10.15, windows-latest]
+        os: [ubuntu-18.04, macos-10.15, windows-2019]
+        include:
+          - arch: ''
+          - arch: 'Win32'
+            os: windows-2019
+          - arch: 'x64'
+            os: windows-2019
 
     runs-on: ${{ matrix.os }}
 
@@ -20,17 +26,17 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Create package name - Unix
-        if: ${{ matrix.os != 'windows-latest' }}
+        if: ${{ matrix.os != 'windows-2019' }}
         run: |
           echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" >> $GITHUB_ENV
 
       - name: Create package name - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         run: |
           echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Ninja - Unix
-        if: ${{ runner.os != 'windows-latest' }}
+        if: ${{ runner.os != 'windows-2019' }}
         uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Download llvm-project source
@@ -39,25 +45,25 @@ jobs:
           git clone --depth 1 --branch llvmorg-${{ env.LLVM_VERSION }} https://github.com/llvm/llvm-project
 
       - name: Create build/installation directory - Unix
-        if: ${{ matrix.os != 'windows-latest' }}
+        if: ${{ matrix.os != 'windows-2019' }}
         run: |
           mkdir ${{ runner.temp }}/build
           mkdir ${{ runner.temp }}/${{ env.PACKAGE_NAME }}
         
       - name: Create build/installation directory - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         run: |
           New-Item -Path ${{ runner.temp }} -Name "build" -ItemType "directory"
           New-Item -Path ${{ runner.temp }} -Name "${{ env.PACKAGE_NAME }}" -ItemType "directory"
 
       - name: Configure build - Windows
         uses: ilammy/msvc-dev-cmd@v1
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         with:
-          arch: x86
+          arch: ${{ matrix.arch }}
 
       - name: Build - Unix
-        if: ${{ matrix.os != 'windows-latest' }}
+        if: ${{ matrix.os != 'windows-2019' }}
         run: |
           cd ${{ runner.temp }}/build
           mkdir Release
@@ -65,39 +71,37 @@ jobs:
           cmake --build . --target install --config Release
 
       - name: Build - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         run: |
           cd ${{ runner.temp }}/build
-          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} -DLLVM_TARGETS_TO_BUILD=X86 -G "Visual Studio 16 2019" -A Win32 -Thost=x64 ${{ runner.temp }}/llvm-project/llvm
-          msbuild ${{ runner.temp }}/build/INSTALL.vcxproj -p:Configuration=Release -p:Platform=Win32 -m
+          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} -DLLVM_TARGETS_TO_BUILD=X86 -G "Visual Studio 16 2019" -A ${{ matrix.arch }} -Thost=x64 ${{ runner.temp }}/llvm-project/llvm
+          msbuild ${{ runner.temp }}/build/INSTALL.vcxproj -p:Configuration=Release -p:Platform=${{ matrix.arch }} -m
 
       # Otherwise, execution permissions are lost for binaries when the 'upload Package' action is used
       - name: Create build tarball - Unix
-        if: ${{ matrix.os != 'windows-latest' }}
+        if: ${{ matrix.os != 'windows-2019' }}
         run: |
           cd ${{ runner.temp }}
           tar -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz ${{ env.PACKAGE_NAME }}
           
       # Install cygwin so we can use GNU tar (instead of Windows' tar)
       - name: Set up Cygwin
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         uses: egor-tensin/setup-cygwin@v3
-        with:
-          platform: x86
           
       - name: Create build tarball - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         run: |
           cd ${{ runner.temp }}
-          C:\tools\cygwin\bin\tar.exe -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz ${{ env.PACKAGE_NAME }}
+          C:\tools\cygwin\bin\tar.exe -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.arch }}.tar.gz ${{ env.PACKAGE_NAME }}
 
       - name: Produce shasum 256 - Unix
-        if: ${{ matrix.os != 'windows-latest' }}
+        if: ${{ matrix.os != 'windows-2019' }}
         run: |
           shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
 
       - name: Produce shasum 256 - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         run: |
           Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz" -Algorithm SHA256
 
