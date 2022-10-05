@@ -103,7 +103,7 @@ jobs:
       - name: Produce shasum 256 - Windows
         if: ${{ matrix.os == 'windows-2019' }}
         run: |
-          Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz" -Algorithm SHA256
+          Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.arch }}.tar.gz" -Algorithm SHA256
 
       - name: upload Package
         uses: actions/upload-artifact@v2.2.3
