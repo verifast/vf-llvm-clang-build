@@ -105,8 +105,16 @@ jobs:
         run: |
           Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.arch }}.tar.gz" -Algorithm SHA256
 
-      - name: upload Package
+      - name: upload Package - Unix
+        if: ${{ matrix.os != 'windows-2019' }}
         uses: actions/upload-artifact@v2.2.3
         with:
           name: vf-llvm-clang-${{ runner.os }}
           path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
+
+      - name: upload Package - Windows
+        if: ${{ matrix.os == 'windows-2019' }}
+        uses: actions/upload-artifact@v2.2.3
+        with:
+          name: vf-llvm-clang-${{ runner.os }}
+          path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.arch }}.tar.gz
