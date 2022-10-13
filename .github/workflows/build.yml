@@ -116,5 +116,5 @@ jobs:
         if: ${{ matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v2.2.3
         with:
-          name: vf-llvm-clang-${{ runner.os }}
+          name: vf-llvm-clang-${{ runner.os }}-${{ matrix.arch }}
           path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.arch }}.tar.gz
