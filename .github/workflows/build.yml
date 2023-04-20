@@ -123,16 +123,16 @@ jobs:
       - name: Create build tarball
         run: |
           cd $(cygpath "${{ runner.temp }}")
-          tar -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.cc_prefix }}.tar.gz ${{ env.PACKAGE_NAME }}
+          tar -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz ${{ env.PACKAGE_NAME }}
         shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
       - name: Produce shasum 256
         run: |
-          Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.cc_prefix }}.tar.gz" -Algorithm SHA256 | Out-File -FilePath ${{ runner.temp }}/${{ env.SHASUM_FILE }} -Encoding utf8
+          Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz" -Algorithm SHA256 | Out-File -FilePath ${{ runner.temp }}/${{ env.SHASUM_FILE }} -Encoding utf8
       - uses: actions/upload-artifact@v3.1.2
         with:
           name: vf-llvm-clang-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}
           path: |
-            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.cc_prefix }}.tar.gz
+            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
 
   MSVC:
@@ -168,14 +168,14 @@ jobs:
       - name: Create build tarball
         run: |
           cd $(cygpath "${{ runner.temp }}")
-          tar -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.arch }}.tar.gz ${{ env.PACKAGE_NAME }}
+          tar -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz ${{ env.PACKAGE_NAME }}
         shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
       - name: Produce shasum 256
         run: |
-          Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.arch }}.tar.gz" -Algorithm SHA256 | Out-File -FilePath ${{ runner.temp }}/${{ env.SHASUM_FILE }} -Encoding utf8
+          Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz" -Algorithm SHA256 | Out-File -FilePath ${{ runner.temp }}/${{ env.SHASUM_FILE }} -Encoding utf8
       - uses: actions/upload-artifact@v3.1.2
         with:
           name: vf-llvm-clang-${{ runner.os }}-MSVC-${{ matrix.arch }}
           path: |
-            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-${{ matrix.arch }}.tar.gz
+            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
