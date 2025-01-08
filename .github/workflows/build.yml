@@ -5,6 +5,7 @@ on: push
 env:
   LLVM_VERSION: ${{ '16.0.1' }}
   COMMON_CMAKE_VARS: ${{ '-DLLVM_ENABLE_PROJECTS=clang -DLLVM_BUILD_TOOLS=OFF -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DLLVM_BUILD_LLVM_DYLIB=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_ENABLE_FFI=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_TARGETS_TO_BUILD=X86' }}
+  AARCH64_CMAKE_VARS: ${{ '-DLLVM_ENABLE_PROJECTS=clang -DLLVM_BUILD_TOOLS=OFF -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DLLVM_BUILD_LLVM_DYLIB=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_ENABLE_FFI=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_TARGETS_TO_BUILD=AArch64' }}
   SHASUM_FILE: 'sha256.txt'
 
 permissions:
@@ -74,7 +75,7 @@ jobs:
         run: |
           cd ${{ runner.temp }}/build
           mkdir Release
-          cmake -G Ninja ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} ${{ runner.temp }}/llvm-project/llvm
+          cmake -G Ninja ${{ env.AARCH64_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} ${{ runner.temp }}/llvm-project/llvm
           cmake --build . --target install --config Release
       # Otherwise, execution permissions are lost for binaries when the 'upload Package' action is used
       - name: Create build tarball
