@@ -9,13 +9,13 @@ env:
 
 permissions:
   id-token: write
+  contents: write
+  attestations: write
 
 jobs:
   MacOS:
-    runs-on: macos-11
+    runs-on: macos-13
     steps:
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3.0.2
       - uses: actions/checkout@v3
       - name: Create package name
         run: |
@@ -43,23 +43,61 @@ jobs:
       - name: Produce shasum 256
         run: |
           shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz > ${{ runner.temp }}/${{ env.SHASUM_FILE }}
-      - name: Sign artifact
-        run: |
-          cd ${{ runner.temp }}
-          cosign sign-blob -y ${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz --bundle ${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz.signature
       - uses: actions/upload-artifact@v3.1.2
         with:
           name: vf-llvm-clang-${{ runner.os }}
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
-            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz.signature
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
+
+  MacOS_AArch64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create package name
+        run: |
+          echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" >> $GITHUB_ENV
+      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Download llvm-project source
+        run: |
+          cd ${{ runner.temp }}
+          git clone --depth 1 --branch llvmorg-${{ env.LLVM_VERSION }} https://github.com/llvm/llvm-project
+      - name: Create build/installation directory
+        run: |
+          mkdir ${{ runner.temp }}/build
+          mkdir ${{ runner.temp }}/${{ env.PACKAGE_NAME }}
+      - name: Build
+        run: |
+          cd ${{ runner.temp }}/build
+          mkdir Release
+          cmake -G Ninja ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} ${{ runner.temp }}/llvm-project/llvm
+          cmake --build . --target install --config Release
+      # Otherwise, execution permissions are lost for binaries when the 'upload Package' action is used
+      - name: Create build tarball
+        run: |
+          cd ${{ runner.temp }}
+          tar -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz ${{ env.PACKAGE_NAME }}
+      - name: Produce shasum 256
+        run: |
+          shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz > ${{ runner.temp }}/${{ env.SHASUM_FILE }}
+      - uses: actions/upload-artifact@v3.1.2
+        with:
+          name: vf-llvm-clang-${{ runner.os }}
+          path: |
+            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz
+            ${{ runner.temp }}/${{ env.SHASUM_FILE }}
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz
 
   Linux:
     runs-on: ubuntu-20.04
     steps:
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3.0.2
       - uses: actions/checkout@v3
       - name: Create package name
         run: |
@@ -87,17 +125,16 @@ jobs:
       - name: Produce shasum 256
         run: |
           shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz > ${{ runner.temp }}/${{ env.SHASUM_FILE }}
-      - name: Sign artifact
-        run: |
-          cd ${{ runner.temp }}
-          cosign sign-blob -y ${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz --bundle ${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz.signature
       - uses: actions/upload-artifact@v3.1.2
         with:
           name: vf-llvm-clang-${{ runner.os }}
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
-            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz.signature
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
 
   MinGW:
     runs-on: windows-2019
@@ -107,8 +144,6 @@ jobs:
           - x86_64
           - i686
     steps:
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3.0.2
       - run: |
           git config --global core.autocrlf input
       - uses: actions/checkout@v3
@@ -147,17 +182,16 @@ jobs:
       - name: Produce shasum 256
         run: |
           Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz" -Algorithm SHA256 | Out-File -FilePath ${{ runner.temp }}/${{ env.SHASUM_FILE }} -Encoding utf8
-      - name: Sign artifact
-        run: |
-          cd ${{ runner.temp }}
-          cosign sign-blob -y ${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz --bundle ${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz.signature
       - uses: actions/upload-artifact@v3.1.2
         with:
           name: vf-llvm-clang-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz
-            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz.signature
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz
 
   MSVC:
     runs-on: windows-2019
@@ -167,8 +201,6 @@ jobs:
           - 'Win32'
           - 'x64'
     steps:
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3.0.2
       - uses: actions/checkout@v3
       - name: Create package name
         run: |
@@ -199,14 +231,13 @@ jobs:
       - name: Produce shasum 256
         run: |
           Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz" -Algorithm SHA256 | Out-File -FilePath ${{ runner.temp }}/${{ env.SHASUM_FILE }} -Encoding utf8
-      - name: Sign artifact
-        run: |
-          cd ${{ runner.temp }}
-          cosign sign-blob -y ${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz --bundle ${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz.signature
       - uses: actions/upload-artifact@v3.1.2
         with:
           name: vf-llvm-clang-${{ runner.os }}-MSVC-${{ matrix.arch }}
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz
-            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz.signature
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz
