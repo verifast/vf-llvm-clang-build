@@ -3,9 +3,9 @@ name: LLVM/Clang build
 on: push
 
 env:
-  LLVM_VERSION: ${{ '16.0.1' }}
-  COMMON_CMAKE_VARS: ${{ '-DLLVM_ENABLE_PROJECTS=clang -DLLVM_BUILD_TOOLS=OFF -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DLLVM_BUILD_LLVM_DYLIB=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_ENABLE_FFI=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_TARGETS_TO_BUILD=X86' }}
-  AARCH64_CMAKE_VARS: ${{ '-DLLVM_ENABLE_PROJECTS=clang -DLLVM_BUILD_TOOLS=OFF -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DLLVM_BUILD_LLVM_DYLIB=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_ENABLE_FFI=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_TARGETS_TO_BUILD=AArch64' }}
+  LLVM_VERSION: ${{ '23.1.2' }}
+  COMMON_CMAKE_VARS: ${{ '-DLLVM_ENABLE_PROJECTS=clang -DLLVM_BUILD_TOOLS=OFF -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DLLVM_BUILD_LLVM_DYLIB=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_ENABLE_FFI=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_TARGETS_TO_BUILD=X86' }}
+  AARCH64_CMAKE_VARS: ${{ '-DLLVM_ENABLE_PROJECTS=clang -DLLVM_BUILD_TOOLS=OFF -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DLLVM_BUILD_LLVM_DYLIB=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_ENABLE_FFI=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_TARGETS_TO_BUILD=AArch64' }}
   SHASUM_FILE: 'sha256.txt'
 
 permissions:
@@ -15,13 +15,14 @@ permissions:
 
 jobs:
   MacOS:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Create package name
         run: |
           echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" >> $GITHUB_ENV
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Install Ninja
+        run: brew install ninja
       - name: Download llvm-project source
         run: |
           cd ${{ runner.temp }}
@@ -34,7 +35,7 @@ jobs:
         run: |
           cd ${{ runner.temp }}/build
           mkdir Release
-          cmake -G Ninja ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} ${{ runner.temp }}/llvm-project/llvm
+          cmake -G Ninja ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} ${{ runner.temp }}/llvm-project/llvm
           cmake --build . --target install --config Release
       # Otherwise, execution permissions are lost for binaries when the 'upload Package' action is used
       - name: Create build tarball
@@ -44,25 +45,26 @@ jobs:
       - name: Produce shasum 256
         run: |
           shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz > ${{ runner.temp }}/${{ env.SHASUM_FILE }}
-      - uses: actions/upload-artifact@v3.1.2
+      - uses: actions/upload-artifact@v6
         with:
           name: vf-llvm-clang-${{ runner.os }}
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
 
   MacOS_AArch64:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Create package name
         run: |
           echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" >> $GITHUB_ENV
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Install Ninja
+        run: brew install ninja
       - name: Download llvm-project source
         run: |
           cd ${{ runner.temp }}
@@ -85,25 +87,26 @@ jobs:
       - name: Produce shasum 256
         run: |
           shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz > ${{ runner.temp }}/${{ env.SHASUM_FILE }}
-      - uses: actions/upload-artifact@v3.1.2
+      - uses: actions/upload-artifact@v6
         with:
-          name: vf-llvm-clang-${{ runner.os }}
+          name: vf-llvm-clang-${{ runner.os }}-aarch64
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz
 
   Linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Create package name
         run: |
           echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" >> $GITHUB_ENV
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download llvm-project source
         run: |
           cd ${{ runner.temp }}
@@ -126,19 +129,19 @@ jobs:
       - name: Produce shasum 256
         run: |
           shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz > ${{ runner.temp }}/${{ env.SHASUM_FILE }}
-      - uses: actions/upload-artifact@v3.1.2
+      - uses: actions/upload-artifact@v6
         with:
           name: vf-llvm-clang-${{ runner.os }}
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
 
   MinGW:
-    runs-on: windows-2019
+    runs-on: windows-2022
     strategy:
       matrix:
         cc_prefix:
@@ -147,7 +150,7 @@ jobs:
     steps:
       - run: |
           git config --global core.autocrlf input
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Create package name
         run: |
           echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -183,26 +186,26 @@ jobs:
       - name: Produce shasum 256
         run: |
           Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz" -Algorithm SHA256 | Out-File -FilePath ${{ runner.temp }}/${{ env.SHASUM_FILE }} -Encoding utf8
-      - uses: actions/upload-artifact@v3.1.2
+      - uses: actions/upload-artifact@v6
         with:
           name: vf-llvm-clang-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MinGW-${{ matrix.cc_prefix }}.tar.gz
 
   MSVC:
-    runs-on: windows-2019
+    runs-on: windows-2022
     strategy:
       matrix:
         arch:
           - 'Win32'
           - 'x64'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Create package name
         run: |
           echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -214,14 +217,11 @@ jobs:
         run: |
           New-Item -Path ${{ runner.temp }} -Name "build" -ItemType "directory"
           New-Item -Path ${{ runner.temp }} -Name "${{ env.PACKAGE_NAME }}" -ItemType "directory"
-      - uses: ilammy/msvc-dev-cmd@v1.12.1
-        with:
-          arch: ${{ matrix.arch }}
       - name: Build
         run: |
           cd ${{ runner.temp }}/build
-          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} -G "Visual Studio 16 2019" -A ${{ matrix.arch }} -Thost=x64 ${{ runner.temp }}/llvm-project/llvm
-          msbuild ${{ runner.temp }}/build/INSTALL.vcxproj -p:Configuration=Release -p:Platform=${{ matrix.arch }} -m
+          cmake ${{ env.COMMON_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -Thost=x64 ${{ runner.temp }}/llvm-project/llvm
+          cmake --build . --target INSTALL --config Release -- -m
       # Install cygwin so we can use GNU tar (instead of Windows' tar)
       - uses: cygwin/cygwin-install-action@master
       - name: Create build tarball
@@ -232,13 +232,13 @@ jobs:
       - name: Produce shasum 256
         run: |
           Get-FileHash -PATH "${{ runner.temp }}\${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz" -Algorithm SHA256 | Out-File -FilePath ${{ runner.temp }}/${{ env.SHASUM_FILE }} -Encoding utf8
-      - uses: actions/upload-artifact@v3.1.2
+      - uses: actions/upload-artifact@v6
         with:
           name: vf-llvm-clang-${{ runner.os }}-MSVC-${{ matrix.arch }}
           path: |
             ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz
             ${{ runner.temp }}/${{ env.SHASUM_FILE }}
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-MSVC-${{ matrix.arch }}.tar.gz
