@@ -162,6 +162,7 @@ jobs:
         run: |
           New-Item -Path ${{ runner.temp }} -Name "build" -ItemType "directory"
           New-Item -Path ${{ runner.temp }} -Name "${{ env.PACKAGE_NAME }}" -ItemType "directory"
+      # libuv1 is pinned to 1.52.1-1 because with 1.53.0-1, Cygwin cmake hangs during compiler detection
       - uses: cygwin/cygwin-install-action@master
         with:
           packages:
@@ -171,6 +172,7 @@ jobs:
             mingw64-${{ matrix.cc_prefix }}-gcc-g++
             cmake
             ninja
+            libuv1=1.52.1-1
       - name: Build
         run: |
           cd $(cygpath "${{ runner.temp }}/build")
