@@ -140,6 +140,48 @@ jobs:
         with:
           subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}.tar.gz
 
+  Linux_AArch64:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v6
+      - name: Create package name
+        run: |
+          echo "PACKAGE_NAME=vf-llvm-clang-build-$(git describe --always)" >> $GITHUB_ENV
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Download llvm-project source
+        run: |
+          cd ${{ runner.temp }}
+          git clone --depth 1 --branch llvmorg-${{ env.LLVM_VERSION }} https://github.com/llvm/llvm-project
+      - name: Create build/installation directory
+        run: |
+          mkdir ${{ runner.temp }}/build
+          mkdir ${{ runner.temp }}/${{ env.PACKAGE_NAME }}
+      - name: Build
+        run: |
+          cd ${{ runner.temp }}/build
+          mkdir Release
+          cmake -G Ninja ${{ env.AARCH64_CMAKE_VARS }} -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/${{ env.PACKAGE_NAME }} ${{ runner.temp }}/llvm-project/llvm
+          cmake --build . --target install --config Release
+      # Otherwise, execution permissions are lost for binaries when the 'upload Package' action is used
+      - name: Create build tarball
+        run: |
+          cd ${{ runner.temp }}
+          tar -cvzf ${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz ${{ env.PACKAGE_NAME }}
+      - name: Produce shasum 256
+        run: |
+          shasum -a 256 ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz > ${{ runner.temp }}/${{ env.SHASUM_FILE }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: vf-llvm-clang-${{ runner.os }}-aarch64
+          path: |
+            ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz
+            ${{ runner.temp }}/${{ env.SHASUM_FILE }}
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ runner.temp }}/${{ env.PACKAGE_NAME }}-${{ runner.os }}-aarch64.tar.gz
+
   MinGW:
     runs-on: windows-2022
     strategy:
